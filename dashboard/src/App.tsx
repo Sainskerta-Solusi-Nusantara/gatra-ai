@@ -12,6 +12,7 @@ import ApprovalsView from './views/ApprovalsView';
 import AuditView from './views/AuditView';
 import RBACView from './views/RBACView';
 import ResignationView from './views/ResignationView';
+import TemplatesView from './views/TemplatesView';
 
 export default function App() {
   const [token, setLocalToken] = useState<string>(getToken());
@@ -74,6 +75,7 @@ export default function App() {
 
       <nav className="side">
         <NavLink to="/fleet">Fleet</NavLink>
+        <NavLink to="/templates">Templates</NavLink>
         <NavLink to="/goals">Goals</NavLink>
         <NavLink to="/designer">Goal Designer</NavLink>
         <NavLink to="/runs">Runs</NavLink>
@@ -87,6 +89,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Navigate to="/fleet" replace />} />
           <Route path="/fleet" element={<FleetView />} />
+          <Route path="/templates" element={<TemplatesView />} />
           <Route path="/goals" element={<GoalsView />} />
           <Route path="/goals/:id" element={<GoalDetailView />} />
           <Route path="/designer" element={<GoalDesignerView />} />

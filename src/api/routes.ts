@@ -31,6 +31,8 @@ import {
   getStakeholderTemplates,
   getTemplateByCommand,
 } from '../templates/engine.js';
+import { getScopePrompt } from '../rbac/scope.js';
+import { getLLMProvider } from '../llm/index.js';
 import { CATALOG } from '../templates/catalog.js';
 import {
   isDepartmentId,
@@ -702,6 +704,50 @@ export function buildRoutes(sessions: SessionManager): Router {
     }
 
     res.json(tpl);
+  });
+
+  // ---------- Chat / Ask — scope-enforced conversation ----------
+  /**
+   * POST /api/chat — Send a message to the AI. Scope is auto-injected.
+   * The AI will refuse to answer questions outside the user's department + jabatan.
+   */
+  r.post('/chat', async (req: Request, res: Response) => {
+    const u = req.user;
+    if (!u) {
+      res.status(401).json({ error: 'unauthenticated' });
+      return;
+    }
+    const { message } = req.body;
+    if (!message || typeof message !== 'string') {
+      res.status(400).json({ error: 'message is required' });
+      return;
+    }
+
+    const scopeNote = getScopePrompt(
+      u.departmentId ?? null,
+      u.jabatan as import('../rbac/types.js').JabatanLevel,
+    );
+
+    const llm = getLLMProvider();
+    const response = await llm.complete({
+      messages: [
+        {
+          role: 'system',
+          content: `Anda adalah asisten AI GATRA untuk ${u.departmentName ?? 'departemen ' + (u.departmentId ?? 'perusahaan')}.
+
+${scopeNote}
+
+${u.jabatan === 'admin_system' ? 'Anda memiliki akses penuh.' : ''}
+
+Selalu gunakan Bahasa Indonesia. Jika ada pertanyaan di luar wewenang, tolak dengan sopan dan sarankan departemen yang tepat.`,
+        },
+        { role: 'user', content: message },
+      ],
+      temperature: 0.3,
+      maxTokens: 2048,
+    });
+
+    res.json({ reply: response.text, scope: { department: u.departmentId, jabatan: u.jabatan } });
   });
 
   // ---------- Error fallthrough ----------

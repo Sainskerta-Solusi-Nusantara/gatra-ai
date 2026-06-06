@@ -27,7 +27,7 @@ export class GoalExecutor implements ExecutorAdapter {
   async runOnce(
     opts: ExecutorRunOpts,
   ): Promise<{ status: 'succeeded' | 'failed' | 'paused'; reason?: string }> {
-    const { run, goal, signal, onProgress } = opts;
+    const { run, goal, signal, scopeNote, onProgress } = opts;
     logger.info({ runId: run.id, goalId: goal.id }, 'executor starting');
     Goals.updateStatus(goal.id, 'planning');
 
@@ -50,7 +50,7 @@ export class GoalExecutor implements ExecutorAdapter {
         return { status: 'failed', reason: 'budget: wallclock exhausted' };
 
       const history = Steps.listByRun(run.id);
-      const plan = await this.callPlanner({ goal, run: this.refreshRun(run), history, signal });
+      const plan = await this.callPlanner({ goal, run: this.refreshRun(run), history, signal, scopeNote });
       tokenBudgetLeft -= estimatePlannerTokens(plan);
 
       // Persist plan as a planning event in the episodic log
@@ -122,6 +122,7 @@ export class GoalExecutor implements ExecutorAdapter {
     run: AgentRun;
     history: Step[];
     signal: AbortSignal;
+    scopeNote?: string;
   }): Promise<PlannerResult> {
     try {
       return await this.planner.plan(args);

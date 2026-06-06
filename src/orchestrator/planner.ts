@@ -5,8 +5,18 @@ import { tools } from '../tools/index.js';
 import { logger } from '../logger.js';
 import type { PlannerResult } from './types.js';
 
-const SYSTEM_PROMPT = `You are GATRA AI, a goal-driven autonomous planner.
-
+/** Build system prompt with optional department scope injection */
+export function buildSystemPrompt(scopeNote?: string): string {
+  let extra = '';
+  if (scopeNote) {
+    extra = `
+═══ BATASAN AKSES ═══
+${scopeNote}
+══════════════════════
+`;
+  }
+  return `You are GATRA AI, a goal-driven autonomous planner.
+${extra}
 You receive:
 - A high-level goal (objective + success criteria).
 - A list of tools available to you.
@@ -31,6 +41,7 @@ Constraints:
 - "args" must be a JSON object that the tool can accept directly.
 - Do not include markdown, backticks, or commentary outside the JSON.
 `;
+}
 
 function clipResults(steps: Step[], maxChars = 4000): string {
   const lines = steps.slice(-10).map((s) => {
@@ -46,8 +57,8 @@ function clipResults(steps: Step[], maxChars = 4000): string {
 }
 
 export class Planner {
-  async plan(opts: { goal: Goal; run: AgentRun; history: Step[]; signal?: AbortSignal }): Promise<PlannerResult> {
-    const { goal, run, history, signal } = opts;
+  async plan(opts: { goal: Goal; run: AgentRun; history: Step[]; signal?: AbortSignal; scopeNote?: string }): Promise<PlannerResult> {
+    const { goal, run, history, signal, scopeNote } = opts;
     const llm = getLLMProvider();
     const allowed = tools
       .list()
@@ -106,7 +117,7 @@ Respond with the JSON plan now.`;
 
     const res = await llm.complete({
       messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'system', content: buildSystemPrompt(scopeNote) },
         { role: 'user', content: user },
       ],
       responseFormat: 'json_object',

@@ -42,6 +42,20 @@ export default function GoalDesignerView() {
     api.listTools().then((r) => setTools(r.items)).catch(() => {});
   }, []);
 
+  // Pick up a preset stashed by TemplatesView when the user clicked "Pakai template".
+  useEffect(() => {
+    const raw = sessionStorage.getItem('gatra.designerPreset');
+    if (!raw) return;
+    sessionStorage.removeItem('gatra.designerPreset');
+    try {
+      const preset = JSON.parse(raw) as { title?: string; objective?: string };
+      if (preset.title) setTitle(preset.title);
+      if (preset.objective) setObjective(preset.objective);
+    } catch {
+      // ignore malformed preset payload
+    }
+  }, []);
+
   const apply = (k: keyof typeof TEMPLATES) => {
     const t = TEMPLATES[k];
     setTitle(t.title);

@@ -22,6 +22,7 @@ export interface ExecutorRunOpts {
   run: AgentRun;
   goal: Goal;
   signal: AbortSignal;
+  scopeNote?: string;  // department scope enforcement prompt
   onProgress: (event: ExecutorProgressEvent) => void;
 }
 

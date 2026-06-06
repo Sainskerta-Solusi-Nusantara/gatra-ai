@@ -10,13 +10,12 @@
 //   3. Run `npm run seed` — templates are upserted by id (idempotent).
 
 import type {
-  DepartmentSlug,
+  DepartmentId,
   Frequency,
+  JabatanLevel,
   OutputFormat,
   UseCaseTemplate,
 } from './types.js';
-import { DEPARTMENT_NAMES } from './types.js';
-import type { JabatanLevel } from '../rbac/types.js';
 
 interface RawTemplate {
   command: string;
@@ -26,21 +25,18 @@ interface RawTemplate {
   exampleGoal: string;
   outputFormat: OutputFormat;
   frequency: Frequency;
-  stakeholders?: DepartmentSlug[];
+  stakeholders?: string[];
 }
 
 /** Expand a `RawTemplate[]` for a single (dept, jabatan) into full records. */
 function section(
-  dept: DepartmentSlug | null,
+  dept: DepartmentId,
   minJabatan: JabatanLevel,
   rows: RawTemplate[],
 ): UseCaseTemplate[] {
-  const departmentName = dept ? DEPARTMENT_NAMES[dept] : 'Cross-Department';
-  const deptIdForId = dept ?? 'cross';
   return rows.map((r) => ({
-    id: `${deptIdForId}:${minJabatan}:${r.command.replace(/^\//, '')}`,
+    id: `${dept}:${minJabatan}:${r.command.replace(/^\//, '')}`,
     departmentId: dept,
-    departmentName,
     minJabatan,
     command: r.command,
     category: r.category,
@@ -65,8 +61,8 @@ const IT_STAFF = section('it', 'staff', [
     description: 'Pantau CPU, RAM, dan koneksi pada server inti.',
     exampleGoal:
       'Cek kondisi server APP-PROD-01 sampai APP-PROD-08 selama 1 jam terakhir. Laporkan CPU > 80%, RAM > 90%, dan koneksi MySQL yang menggantung lebih dari 10 menit.',
-    outputFormat: 'report',
-    frequency: 'daily',
+    outputFormat: 'analysis',
+    frequency: 'continuous',
   },
   {
     command: '/cek-log-error',
@@ -75,7 +71,7 @@ const IT_STAFF = section('it', 'staff', [
     description: 'Scan log aplikasi untuk error level WARN ke atas.',
     exampleGoal:
       'Telusuri /var/log/app pada server CORE-BANKING-01 sejak pukul 22.00 tadi malam. Kelompokkan error level ERROR per modul, dan tandai yang muncul > 50 kali.',
-    outputFormat: 'report',
+    outputFormat: 'analysis',
     frequency: 'daily',
   },
   {
@@ -85,8 +81,8 @@ const IT_STAFF = section('it', 'staff', [
     description: 'Restart service tertentu dengan log perubahan.',
     exampleGoal:
       'Restart service nginx pada server WEB-DMZ-02 karena response time melonjak ke 8 detik. Pastikan health check hijau setelah restart dan buatkan tiket ITSM.',
-    outputFormat: 'notification',
-    frequency: 'on-demand',
+    outputFormat: 'action',
+    frequency: 'one-time',
   },
   {
     command: '/backup-db',
@@ -95,7 +91,7 @@ const IT_STAFF = section('it', 'staff', [
     description: 'Jalankan backup logical/physical database.',
     exampleGoal:
       'Eksekusi backup database core_banking ukuran ~420GB ke storage offsite. Verifikasi checksum, catat durasi, dan kirim notifikasi ke supervisor IT.',
-    outputFormat: 'notification',
+    outputFormat: 'action',
     frequency: 'daily',
   },
   {
@@ -115,8 +111,8 @@ const IT_STAFF = section('it', 'staff', [
     description: 'Reset password user atas permintaan resmi.',
     exampleGoal:
       'Reset password Active Directory untuk user NIP 19880412 (Cabang Surabaya). Kirim password sementara ke nomor WA terdaftar dan paksa ganti pada login pertama.',
-    outputFormat: 'notification',
-    frequency: 'on-demand',
+    outputFormat: 'action',
+    frequency: 'one-time',
   },
   {
     command: '/scan-vulnerability',
@@ -125,7 +121,7 @@ const IT_STAFF = section('it', 'staff', [
     description: 'Jalankan vuln scan dasar pada host/aplikasi.',
     exampleGoal:
       'Jalankan scan Nessus pada subnet 10.20.30.0/24 (server zona DMZ). Fokus pada CVE severity High/Critical dan buatkan ringkasan untuk supervisor IT.',
-    outputFormat: 'report',
+    outputFormat: 'analysis',
     frequency: 'weekly',
   },
   {
@@ -135,7 +131,7 @@ const IT_STAFF = section('it', 'staff', [
     description: 'Pantau disk volume yang mendekati penuh.',
     exampleGoal:
       'Cek seluruh volume di server NAS-FILER-01 sampai NAS-FILER-04. Beri peringatan jika utilisasi > 85% dan rekomendasikan folder mana yang paling layak diarsipkan.',
-    outputFormat: 'report',
+    outputFormat: 'analysis',
     frequency: 'daily',
   },
 ]);
@@ -148,7 +144,7 @@ const IT_SUPERVISOR = section('it', 'supervisor', [
     description: 'Eksekusi deployment dengan checklist rilis.',
     exampleGoal:
       'Lakukan deploy aplikasi Mobile Banking versi 4.12.0 ke environment staging. Jalankan smoke test 23 skenario, dan rekap hasil ke Confluence page rilis 2026-06.',
-    outputFormat: 'report',
+    outputFormat: 'action',
     frequency: 'weekly',
   },
   {
@@ -158,7 +154,7 @@ const IT_SUPERVISOR = section('it', 'supervisor', [
     description: 'Review dan rapikan hak akses sistem.',
     exampleGoal:
       'Review hak akses ke aplikasi SAP modul FI untuk 38 user di Divisi Finance Cabang Medan. Cabut akses yang sudah > 90 hari tidak login dan eskalasikan ke Manager IT.',
-    outputFormat: 'report',
+    outputFormat: 'action',
     frequency: 'monthly',
   },
   {
@@ -169,7 +165,7 @@ const IT_SUPERVISOR = section('it', 'supervisor', [
     exampleGoal:
       'Buat insiden P2 untuk gangguan otentikasi LDAP pukul 09.45 WIB. Susun timeline, root cause sementara, dampak ke 1.200 user, dan langkah mitigasi 30 menit ke depan.',
     outputFormat: 'report',
-    frequency: 'on-demand',
+    frequency: 'one-time',
   },
   {
     command: '/audit-log',
@@ -178,7 +174,7 @@ const IT_SUPERVISOR = section('it', 'supervisor', [
     description: 'Tarik log akses untuk audit internal.',
     exampleGoal:
       'Tarik log akses ke folder /finance/laporan-rahasia selama 30 hari terakhir. Identifikasi user di luar Divisi Finance yang berhasil membaca file, dan beri rekomendasi.',
-    outputFormat: 'dataset',
+    outputFormat: 'data',
     frequency: 'monthly',
   },
   {
@@ -188,8 +184,8 @@ const IT_SUPERVISOR = section('it', 'supervisor', [
     description: 'Prediksi kebutuhan kapasitas infrastruktur.',
     exampleGoal:
       'Prediksi kebutuhan storage cluster Hadoop 6 bulan ke depan berdasar growth 12% per bulan. Rekomendasikan upgrade node atau pembelian disk baru beserta estimasi biaya.',
-    outputFormat: 'report',
-    frequency: 'quarterly',
+    outputFormat: 'analysis',
+    frequency: 'monthly',
   },
 ]);
 
@@ -212,8 +208,8 @@ const IT_MANAGER = section('it', 'manager', [
     description: 'Skoring performa vendor IT.',
     exampleGoal:
       'Evaluasi performa 3 vendor SOC outsourcing periode 2025-2026: rata-rata MTTR, jumlah false positive, kepatuhan SLA, dan rekomendasi perpanjangan / re-tender.',
-    outputFormat: 'report',
-    frequency: 'quarterly',
+    outputFormat: 'analysis',
+    frequency: 'monthly',
     stakeholders: ['procurement'],
   },
   {
@@ -223,7 +219,7 @@ const IT_MANAGER = section('it', 'manager', [
     description: 'Pantau realisasi anggaran IT vs pagu.',
     exampleGoal:
       'Bandingkan realisasi anggaran IT Q2 2026 (Rp 18,4 M) terhadap pagu (Rp 22 M). Identifikasi line item yang berisiko over budget di kuartal berikutnya.',
-    outputFormat: 'dashboard',
+    outputFormat: 'analysis',
     frequency: 'monthly',
     stakeholders: ['finance'],
   },
@@ -234,7 +230,7 @@ const IT_MANAGER = section('it', 'manager', [
     description: 'Laporkan pencapaian SLA per layanan.',
     exampleGoal:
       'Buat dashboard pencapaian SLA 12 layanan kritikal selama Mei 2026. Highlight layanan ATM Switching yang turun ke 99,78% (target 99,95%) dan akar masalahnya.',
-    outputFormat: 'dashboard',
+    outputFormat: 'analysis',
     frequency: 'monthly',
   },
   {
@@ -245,7 +241,7 @@ const IT_MANAGER = section('it', 'manager', [
     exampleGoal:
       'Cek kepatuhan kontrol ISO 27001 (114 kontrol) versi audit terakhir. Identifikasi gap pada kontrol A.12 (operations security) dan susun action plan 30/60/90 hari.',
     outputFormat: 'report',
-    frequency: 'quarterly',
+    frequency: 'monthly',
     stakeholders: ['legal'],
   },
 ]);
@@ -259,7 +255,7 @@ const IT_DIREKTUR = section('it', 'direktur', [
     exampleGoal:
       'Susun draf IT Strategic Plan 2026-2028 yang menutup gap dari hasil maturity assessment terakhir (level 2,4 dari 5) dan selaras dengan target RBB Direksi.',
     outputFormat: 'report',
-    frequency: 'quarterly',
+    frequency: 'monthly',
     stakeholders: ['finance', 'operations'],
   },
   {
@@ -270,7 +266,7 @@ const IT_DIREKTUR = section('it', 'direktur', [
     exampleGoal:
       'Buat roadmap digital transformation untuk 6 unit bisnis prioritas (Retail Banking, Wholesale, Treasury, Mikro, Syariah, Operations) periode 2026 H2 - 2027 H1.',
     outputFormat: 'report',
-    frequency: 'quarterly',
+    frequency: 'monthly',
     stakeholders: ['operations', 'marketing'],
   },
   {
@@ -280,8 +276,8 @@ const IT_DIREKTUR = section('it', 'direktur', [
     description: 'Identifikasi top IT risk eksekutif.',
     exampleGoal:
       'Identifikasi 10 top IT risk korporasi dengan inherent / residual rating, mitigasi, dan owner. Petakan terhadap matriks 5x5 Direksi periode Juni 2026.',
-    outputFormat: 'report',
-    frequency: 'quarterly',
+    outputFormat: 'analysis',
+    frequency: 'monthly',
     stakeholders: ['legal'],
   },
 ]);
@@ -298,7 +294,7 @@ const HRD_STAFF = section('hrd', 'staff', [
     description: 'Tambah karyawan baru ke sistem HRIS.',
     exampleGoal:
       'Input data 12 karyawan baru batch onboarding 1 Juni 2026 ke HRIS: NIP, jabatan Officer, unit kerja, golongan, dan upload kontrak PKWT 2 tahun.',
-    outputFormat: 'notification',
+    outputFormat: 'action',
     frequency: 'weekly',
   },
   {
@@ -308,7 +304,7 @@ const HRD_STAFF = section('hrd', 'staff', [
     description: 'Tarik data kehadiran per unit kerja.',
     exampleGoal:
       'Tarik data absensi Divisi Operasional Kantor Pusat periode 1-15 Juni 2026. Identifikasi karyawan dengan tingkat keterlambatan > 3 kali untuk dirujuk ke supervisor.',
-    outputFormat: 'dataset',
+    outputFormat: 'data',
     frequency: 'weekly',
   },
   {
@@ -318,7 +314,7 @@ const HRD_STAFF = section('hrd', 'staff', [
     description: 'Cek sisa hak cuti per karyawan.',
     exampleGoal:
       'Cek sisa cuti tahunan 2026 untuk semua karyawan Divisi Treasury (47 orang). Tandai yang masih > 10 hari belum diambil dan jadwalkan reminder via WA.',
-    outputFormat: 'dataset',
+    outputFormat: 'data',
     frequency: 'monthly',
   },
   {
@@ -328,8 +324,8 @@ const HRD_STAFF = section('hrd', 'staff', [
     description: 'Update data master karyawan.',
     exampleGoal:
       'Update data 28 karyawan yang baru menyelesaikan rotasi: jabatan baru, unit kerja, atasan langsung, dan grade. Sumber data: SK Mutasi nomor 042/SK/HC/VI/2026.',
-    outputFormat: 'notification',
-    frequency: 'on-demand',
+    outputFormat: 'action',
+    frequency: 'one-time',
   },
   {
     command: '/rekap-lembur',
@@ -338,7 +334,7 @@ const HRD_STAFF = section('hrd', 'staff', [
     description: 'Rekap jam lembur bulanan per unit.',
     exampleGoal:
       'Rekap jam lembur Mei 2026 per unit kerja. Total lembur Divisi IT 1.240 jam — verifikasi terhadap form persetujuan dan kirim ke Payroll untuk diproses.',
-    outputFormat: 'dataset',
+    outputFormat: 'data',
     frequency: 'monthly',
     stakeholders: ['finance'],
   },
@@ -352,7 +348,7 @@ const HRD_SUPERVISOR = section('hrd', 'supervisor', [
     description: 'Screening awal kandidat rekrutmen.',
     exampleGoal:
       'Screening 156 CV pelamar posisi Relationship Manager Wholesale. Sortir berdasar pengalaman > 3 tahun di corporate banking, IPK > 3,0, dan domisili Jabodetabek.',
-    outputFormat: 'dataset',
+    outputFormat: 'analysis',
     frequency: 'weekly',
   },
   {
@@ -362,7 +358,7 @@ const HRD_SUPERVISOR = section('hrd', 'supervisor', [
     description: 'Koordinasi onboarding karyawan baru.',
     exampleGoal:
       'Siapkan onboarding pack untuk 12 karyawan batch 1 Juni 2026: jadwal induksi 5 hari, akses sistem, name tag, kelengkapan kantor, dan buddy assignment per orang.',
-    outputFormat: 'report',
+    outputFormat: 'action',
     frequency: 'monthly',
     stakeholders: ['it', 'ga'],
   },
@@ -373,7 +369,7 @@ const HRD_SUPERVISOR = section('hrd', 'supervisor', [
     description: 'Susun jadwal pelatihan internal/external.',
     exampleGoal:
       'Susun jadwal Pelatihan Risk Management Q3 2026 untuk 84 peserta dari 6 cabang. Bagi ke 4 batch, kontak trainer eksternal, dan booking ruang Training Center lt. 8.',
-    outputFormat: 'report',
+    outputFormat: 'action',
     frequency: 'monthly',
   },
   {
@@ -383,8 +379,8 @@ const HRD_SUPERVISOR = section('hrd', 'supervisor', [
     description: 'Input data KPI per karyawan.',
     exampleGoal:
       'Input KPI semester 1 2026 untuk 142 karyawan Divisi Operasional. Validasi terhadap form penilaian atasan dan flag KPI di bawah 80% untuk PIP plan.',
-    outputFormat: 'dataset',
-    frequency: 'quarterly',
+    outputFormat: 'data',
+    frequency: 'monthly',
   },
 ]);
 
@@ -396,7 +392,7 @@ const HRD_MANAGER = section('hrd', 'manager', [
     description: 'Laporan absensi konsolidasi korporasi.',
     exampleGoal:
       'Susun laporan absensi konsolidasi Mei 2026 untuk 6 cabang dan kantor pusat. Tampilkan tingkat kehadiran, keterlambatan, dan absensi tanpa keterangan per divisi.',
-    outputFormat: 'dashboard',
+    outputFormat: 'report',
     frequency: 'monthly',
   },
   {
@@ -406,8 +402,8 @@ const HRD_MANAGER = section('hrd', 'manager', [
     description: 'Analisa turnover karyawan.',
     exampleGoal:
       'Analisa turnover 12 bulan terakhir per divisi dan generasi karyawan. Tingkat turnover IT 18% (industri 12%) — uraikan alasan resign dan rekomendasikan retention plan.',
-    outputFormat: 'report',
-    frequency: 'quarterly',
+    outputFormat: 'analysis',
+    frequency: 'monthly',
   },
   {
     command: '/training-needs',
@@ -416,8 +412,8 @@ const HRD_MANAGER = section('hrd', 'manager', [
     description: 'Analisa kebutuhan pelatihan korporasi.',
     exampleGoal:
       'Analisa training needs 2026 berdasar hasil performance review dan competency gap. Susun katalog 24 program prioritas dan estimasi biaya per program.',
-    outputFormat: 'report',
-    frequency: 'quarterly',
+    outputFormat: 'analysis',
+    frequency: 'monthly',
     stakeholders: ['finance'],
   },
   {
@@ -427,8 +423,8 @@ const HRD_MANAGER = section('hrd', 'manager', [
     description: 'Review struktur organisasi.',
     exampleGoal:
       'Review struktur organisasi Divisi Risk Management. Identifikasi span of control > 12 langsung, jabatan kosong > 3 bulan, dan rekomendasi restrukturisasi.',
-    outputFormat: 'report',
-    frequency: 'quarterly',
+    outputFormat: 'analysis',
+    frequency: 'monthly',
   },
   {
     command: '/payroll-summary',
@@ -451,8 +447,8 @@ const HRD_DIREKTUR = section('hrd', 'direktur', [
     description: 'Susun workforce plan multi-tahun.',
     exampleGoal:
       'Susun workforce plan 2026-2028 mengantisipasi pensiun 142 karyawan dan ekspansi 3 cabang baru. Petakan demand vs supply per cluster jabatan.',
-    outputFormat: 'report',
-    frequency: 'quarterly',
+    outputFormat: 'analysis',
+    frequency: 'monthly',
     stakeholders: ['finance', 'operations'],
   },
   {
@@ -463,7 +459,7 @@ const HRD_DIREKTUR = section('hrd', 'direktur', [
     exampleGoal:
       'Susun talent management plan 2026: 9-box mapping 1.847 karyawan, identifikasi 124 top talent, suksesi 38 posisi kritikal, dan IDP per talent.',
     outputFormat: 'report',
-    frequency: 'quarterly',
+    frequency: 'monthly',
   },
   {
     command: '/hr-strategic-report',
@@ -473,7 +469,7 @@ const HRD_DIREKTUR = section('hrd', 'direktur', [
     exampleGoal:
       'Susun laporan strategis HR untuk RUPS 2026: realisasi headcount, biaya per karyawan, engagement index, turnover, dan progres transformasi people.',
     outputFormat: 'report',
-    frequency: 'quarterly',
+    frequency: 'monthly',
     stakeholders: ['finance'],
   },
 ]);
@@ -490,7 +486,7 @@ const FINANCE_STAFF = section('finance', 'staff', [
     description: 'Input dan proses invoice vendor.',
     exampleGoal:
       'Proses 38 invoice vendor masuk hari ini. Validasi nomor PO, kelengkapan dokumen Faktur Pajak, dan kirim ke approval atasan untuk yang > Rp 50 juta.',
-    outputFormat: 'dataset',
+    outputFormat: 'action',
     frequency: 'daily',
   },
   {
@@ -500,7 +496,7 @@ const FINANCE_STAFF = section('finance', 'staff', [
     description: 'Cek status pembayaran invoice.',
     exampleGoal:
       'Cek status pembayaran invoice PT Wijaya Karya Konstruksi periode Maret-Mei 2026. Total 14 invoice senilai Rp 2,8 M — beri status per invoice dan estimasi cair.',
-    outputFormat: 'dataset',
+    outputFormat: 'data',
     frequency: 'weekly',
   },
   {
@@ -510,8 +506,8 @@ const FINANCE_STAFF = section('finance', 'staff', [
     description: 'Input usulan budget unit kerja.',
     exampleGoal:
       'Input usulan budget 2027 dari 14 unit kerja. Total usulan Rp 184 M (vs realisasi 2025 Rp 156 M). Validasi format template dan kelengkapan justifikasi per line item.',
-    outputFormat: 'dataset',
-    frequency: 'quarterly',
+    outputFormat: 'action',
+    frequency: 'monthly',
   },
   {
     command: '/rekap-pengeluaran',
@@ -520,7 +516,7 @@ const FINANCE_STAFF = section('finance', 'staff', [
     description: 'Rekap pengeluaran kas per hari.',
     exampleGoal:
       'Rekap pengeluaran kas hari ini di rekening operasional Bank Mandiri 1234567890. Total 27 transaksi senilai Rp 482 juta. Tampilkan per kategori beban.',
-    outputFormat: 'dataset',
+    outputFormat: 'data',
     frequency: 'daily',
   },
   {
@@ -530,7 +526,7 @@ const FINANCE_STAFF = section('finance', 'staff', [
     description: '3-way match antara PO, GR, dan invoice.',
     exampleGoal:
       'Lakukan 3-way match untuk 56 invoice batch hari ini. Highlight invoice yang harga unit-nya menyimpang > 5% dari PO atau GR-nya belum di-post.',
-    outputFormat: 'report',
+    outputFormat: 'analysis',
     frequency: 'daily',
     stakeholders: ['procurement'],
   },
@@ -544,7 +540,7 @@ const FINANCE_SUPERVISOR = section('finance', 'supervisor', [
     description: 'Rekonsiliasi budget vs realisasi.',
     exampleGoal:
       'Rekonsiliasi budget vs realisasi Mei 2026 untuk Divisi IT. Pagu Rp 22 M, realisasi Rp 18,4 M. Identifikasi line item over (jika ada) dan klarifikasi ke divisi.',
-    outputFormat: 'report',
+    outputFormat: 'analysis',
     frequency: 'monthly',
   },
   {
@@ -554,7 +550,7 @@ const FINANCE_SUPERVISOR = section('finance', 'supervisor', [
     description: 'Monitoring posisi cashflow harian.',
     exampleGoal:
       'Susun monitoring cashflow 7 hari ke depan. Saldo awal Rp 24,8 M, proyeksi inflow Rp 18 M, outflow Rp 22,4 M. Highlight tanggal yang berisiko negatif.',
-    outputFormat: 'dashboard',
+    outputFormat: 'analysis',
     frequency: 'daily',
   },
   {
@@ -564,7 +560,7 @@ const FINANCE_SUPERVISOR = section('finance', 'supervisor', [
     description: 'Daftar transaksi menunggu approval.',
     exampleGoal:
       'Tarik semua approval pending di sistem ERP per pukul 16.00 hari ini. 24 transaksi menunggu, dengan 3 transaksi > 5 hari. Eskalasi ke Manager Finance.',
-    outputFormat: 'dataset',
+    outputFormat: 'data',
     frequency: 'daily',
   },
   {
@@ -597,7 +593,7 @@ const FINANCE_MANAGER = section('finance', 'manager', [
     description: 'Analisa variansi budget per divisi.',
     exampleGoal:
       'Analisa variansi budget Mei 2026 per divisi. Highlight 4 divisi dengan variansi unfavorable > 10% dan minta klarifikasi resmi dari masing-masing kepala divisi.',
-    outputFormat: 'report',
+    outputFormat: 'analysis',
     frequency: 'monthly',
   },
   {
@@ -607,7 +603,7 @@ const FINANCE_MANAGER = section('finance', 'manager', [
     description: 'Forecast pendapatan rolling 6 bulan.',
     exampleGoal:
       'Susun forecast revenue 6 bulan ke depan berbasis aktual YTD dan asumsi makro terbaru (BI Rate 5,75%, inflasi 3,4%). Pisahkan per segmen bisnis.',
-    outputFormat: 'dashboard',
+    outputFormat: 'analysis',
     frequency: 'monthly',
   },
   {
@@ -617,8 +613,8 @@ const FINANCE_MANAGER = section('finance', 'manager', [
     description: 'Analisa struktur biaya korporasi.',
     exampleGoal:
       'Analisa struktur biaya YTD Mei 2026. Beban personil 48%, beban umum 22%, beban IT 14%, beban marketing 9%, beban lain 7%. Rekomendasikan 3 area cost saving.',
-    outputFormat: 'report',
-    frequency: 'quarterly',
+    outputFormat: 'analysis',
+    frequency: 'monthly',
   },
   {
     command: '/audit-trail-finance',
@@ -627,7 +623,7 @@ const FINANCE_MANAGER = section('finance', 'manager', [
     description: 'Tarik audit trail transaksi keuangan.',
     exampleGoal:
       'Tarik audit trail jurnal manual > Rp 100 juta bulan Mei 2026 untuk persiapan audit eksternal. Verifikasi approval, supporting document, dan klasifikasi akun.',
-    outputFormat: 'dataset',
+    outputFormat: 'data',
     frequency: 'monthly',
     stakeholders: ['legal'],
   },
@@ -642,7 +638,7 @@ const FINANCE_DIREKTUR = section('finance', 'direktur', [
     exampleGoal:
       'Susun strategi keuangan 2026-2028: target ROE 14%, CAR 22%, NIM 5,4%. Sertakan capital plan, funding strategy, dan stress test sederhana.',
     outputFormat: 'report',
-    frequency: 'quarterly',
+    frequency: 'monthly',
   },
   {
     command: '/risk-assessment-finance',
@@ -651,8 +647,8 @@ const FINANCE_DIREKTUR = section('finance', 'direktur', [
     description: 'Asesmen risiko finansial korporasi.',
     exampleGoal:
       'Identifikasi 10 top financial risk korporasi (likuiditas, pasar, kredit, operasional). Petakan ke matriks risiko 5x5 dan rancang mitigasi per risiko.',
-    outputFormat: 'report',
-    frequency: 'quarterly',
+    outputFormat: 'analysis',
+    frequency: 'monthly',
     stakeholders: ['legal'],
   },
   {
@@ -662,8 +658,8 @@ const FINANCE_DIREKTUR = section('finance', 'direktur', [
     description: 'Analisa kelayakan investasi.',
     exampleGoal:
       'Analisa kelayakan investasi data center on-prem Rp 84 M vs sewa cloud Rp 12 M/tahun untuk 5 tahun. Hitung NPV, IRR, payback, dan rekomendasi.',
-    outputFormat: 'report',
-    frequency: 'on-demand',
+    outputFormat: 'analysis',
+    frequency: 'one-time',
     stakeholders: ['it'],
   },
 ]);
@@ -680,7 +676,7 @@ const OPS_STAFF = section('operations', 'staff', [
     description: 'Cek posisi stok per SKU.',
     exampleGoal:
       'Cek posisi stok 12 SKU prioritas di Gudang Cikarang. SKU AGR-1042 (pupuk NPK 50kg) tersisa 124 sak dari minimum stock 500 — siapkan permintaan replenishment.',
-    outputFormat: 'dataset',
+    outputFormat: 'data',
     frequency: 'daily',
   },
   {
@@ -690,7 +686,7 @@ const OPS_STAFF = section('operations', 'staff', [
     description: 'Update data inventory setelah movement.',
     exampleGoal:
       'Update inventory setelah penerimaan 18 truk hari ini (total 2.400 ton). Validasi terhadap delivery order vendor PT Saprotan Utama dan post ke ERP.',
-    outputFormat: 'notification',
+    outputFormat: 'action',
     frequency: 'daily',
   },
   {
@@ -700,7 +696,7 @@ const OPS_STAFF = section('operations', 'staff', [
     description: 'Track status pengiriman pesanan.',
     exampleGoal:
       'Track status 42 sales order yang akan dikirim besok ke wilayah Jawa Tengah. Pastikan armada, dokumen, dan kontak penerima sudah lengkap.',
-    outputFormat: 'dataset',
+    outputFormat: 'data',
     frequency: 'daily',
   },
   {
@@ -710,7 +706,7 @@ const OPS_STAFF = section('operations', 'staff', [
     description: 'Susun jadwal produksi harian.',
     exampleGoal:
       'Susun jadwal produksi line A dan B besok berdasar sales order 320 ton dan stok bahan baku tersedia. Sesuaikan dengan shift dan jam henti maintenance.',
-    outputFormat: 'report',
+    outputFormat: 'action',
     frequency: 'daily',
   },
   {
@@ -733,7 +729,7 @@ const OPS_SUPERVISOR = section('operations', 'supervisor', [
     description: 'Identifikasi peluang optimasi proses.',
     exampleGoal:
       'Telusuri data produksi line A 30 hari terakhir. Identifikasi 3 langkah proses dengan cycle time terlama dan usulkan eksperimen perbaikan.',
-    outputFormat: 'report',
+    outputFormat: 'analysis',
     frequency: 'monthly',
   },
   {
@@ -743,7 +739,7 @@ const OPS_SUPERVISOR = section('operations', 'supervisor', [
     description: 'Monitoring workflow operasional.',
     exampleGoal:
       'Pantau workflow approval sales order 14 hari terakhir. SLA approval 4 jam, namun rata-rata 6,2 jam. Identifikasi langkah mana yang menjadi bottleneck.',
-    outputFormat: 'dashboard',
+    outputFormat: 'analysis',
     frequency: 'weekly',
   },
   {
@@ -753,7 +749,7 @@ const OPS_SUPERVISOR = section('operations', 'supervisor', [
     description: 'Analisa efisiensi operasional.',
     exampleGoal:
       'Analisa OEE (Overall Equipment Effectiveness) line A bulan Mei: availability 84%, performance 78%, quality 96%. OEE 63% (target 70%) — uraikan losses.',
-    outputFormat: 'report',
+    outputFormat: 'analysis',
     frequency: 'monthly',
   },
   {
@@ -763,7 +759,7 @@ const OPS_SUPERVISOR = section('operations', 'supervisor', [
     description: 'Alokasi resource produksi.',
     exampleGoal:
       'Rencanakan alokasi 18 operator untuk 3 line produksi minggu depan. Pertimbangkan jadwal training 4 orang dan cuti 2 orang yang sudah disetujui.',
-    outputFormat: 'report',
+    outputFormat: 'action',
     frequency: 'weekly',
   },
 ]);
@@ -786,7 +782,7 @@ const OPS_MANAGER = section('operations', 'manager', [
     description: 'Dashboard KPI operasional.',
     exampleGoal:
       'Susun dashboard KPI operasional Q2 2026: produksi vs target, OEE, on-time delivery, reject rate, dan biaya per ton. Komparasi terhadap 4 kuartal sebelumnya.',
-    outputFormat: 'dashboard',
+    outputFormat: 'analysis',
     frequency: 'monthly',
   },
   {
@@ -796,7 +792,7 @@ const OPS_MANAGER = section('operations', 'manager', [
     description: 'Analisa efisiensi biaya operasional.',
     exampleGoal:
       'Analisa biaya per ton produksi line A vs line B Mei 2026. Selisih Rp 142 ribu/ton — uraikan komponen biaya yang berbeda dan rekomendasi penyamaan.',
-    outputFormat: 'report',
+    outputFormat: 'analysis',
     frequency: 'monthly',
     stakeholders: ['finance'],
   },
@@ -807,8 +803,8 @@ const OPS_MANAGER = section('operations', 'manager', [
     description: 'Analisa bottleneck proses.',
     exampleGoal:
       'Identifikasi bottleneck end-to-end pesanan sampai pengiriman. Rata-rata lead time 9 hari (target 7) — buat fishbone dan rekomendasi 3 perbaikan prioritas.',
-    outputFormat: 'report',
-    frequency: 'quarterly',
+    outputFormat: 'analysis',
+    frequency: 'monthly',
   },
 ]);
 
@@ -821,7 +817,7 @@ const OPS_DIREKTUR = section('operations', 'direktur', [
     exampleGoal:
       'Susun strategi operasional 2026-2028: target kapasitas produksi 72.000 ton/tahun, ekspansi gudang regional, dan otomasi 3 line eksisting.',
     outputFormat: 'report',
-    frequency: 'quarterly',
+    frequency: 'monthly',
     stakeholders: ['finance'],
   },
   {
@@ -831,8 +827,8 @@ const OPS_DIREKTUR = section('operations', 'direktur', [
     description: 'Optimasi end-to-end supply chain.',
     exampleGoal:
       'Susun roadmap optimasi supply chain end-to-end: cost-to-serve, inventory turn, dan supplier consolidation. Target penurunan biaya logistik 8% dalam 12 bulan.',
-    outputFormat: 'report',
-    frequency: 'quarterly',
+    outputFormat: 'analysis',
+    frequency: 'monthly',
     stakeholders: ['procurement', 'finance'],
   },
 ]);
@@ -849,8 +845,8 @@ const LEGAL_STAFF = section('legal', 'staff', [
     description: 'Review draf kontrak komersial.',
     exampleGoal:
       'Review draf kontrak kerjasama dengan PT Telkom (kerjasama jaringan internet, nilai Rp 4,8 M / 24 bulan). Cek klausul terminasi, SLA, denda, dan force majeure.',
-    outputFormat: 'report',
-    frequency: 'on-demand',
+    outputFormat: 'analysis',
+    frequency: 'one-time',
   },
   {
     command: '/template-perjanjian',
@@ -859,8 +855,8 @@ const LEGAL_STAFF = section('legal', 'staff', [
     description: 'Susun template perjanjian standar.',
     exampleGoal:
       'Susun template Perjanjian Kerahasiaan (NDA) versi 2026 mengacu pada UU PDP No. 27/2022 dan kebijakan internal Risk Management terbaru.',
-    outputFormat: 'file',
-    frequency: 'quarterly',
+    outputFormat: 'report',
+    frequency: 'monthly',
   },
   {
     command: '/cek-regulasi',
@@ -869,7 +865,7 @@ const LEGAL_STAFF = section('legal', 'staff', [
     description: 'Scan regulasi terbaru OJK / BI / Kemenkeu.',
     exampleGoal:
       'Cek POJK dan SEOJK yang terbit dalam 30 hari terakhir. Identifikasi yang relevan ke Divisi Treasury dan susun ringkasan dampak per regulasi.',
-    outputFormat: 'report',
+    outputFormat: 'analysis',
     frequency: 'weekly',
   },
   {
@@ -879,8 +875,8 @@ const LEGAL_STAFF = section('legal', 'staff', [
     description: 'Draft surat resmi keluar.',
     exampleGoal:
       'Draft surat keberatan ke Disnaker terkait NORMA PHK karyawan A (NIP 19850421). Cantumkan kronologis, dasar hukum, dan tuntutan pencabutan rekomendasi.',
-    outputFormat: 'file',
-    frequency: 'on-demand',
+    outputFormat: 'report',
+    frequency: 'one-time',
   },
 ]);
 
@@ -892,8 +888,8 @@ const LEGAL_SUPERVISOR = section('legal', 'supervisor', [
     description: 'Cek kepatuhan regulasi internal.',
     exampleGoal:
       'Cek kepatuhan implementasi POJK No. 11/POJK.03/2022 tentang Manajemen Risiko di 6 cabang. Identifikasi gap dan rekomendasi action plan.',
-    outputFormat: 'report',
-    frequency: 'quarterly',
+    outputFormat: 'analysis',
+    frequency: 'monthly',
   },
   {
     command: '/regulatory-monitoring',
@@ -912,8 +908,8 @@ const LEGAL_SUPERVISOR = section('legal', 'supervisor', [
     description: 'Asesmen risiko hukum aktif.',
     exampleGoal:
       'Asesmen risiko hukum atas 24 perkara aktif (12 perdata, 9 pidana, 3 TUN). Tampilkan exposure finansial, probabilitas kalah, dan strategi penanganan.',
-    outputFormat: 'report',
-    frequency: 'quarterly',
+    outputFormat: 'analysis',
+    frequency: 'monthly',
   },
 ]);
 
@@ -935,8 +931,8 @@ const LEGAL_MANAGER = section('legal', 'manager', [
     description: 'Susun draf kebijakan internal.',
     exampleGoal:
       'Susun draf Kebijakan Whistleblowing System sesuai POJK 39/2017 dan UU 31/1999. Sertakan tata cara pelaporan, perlindungan whistleblower, dan tata kelola.',
-    outputFormat: 'file',
-    frequency: 'quarterly',
+    outputFormat: 'report',
+    frequency: 'monthly',
   },
   {
     command: '/litigation-tracker',
@@ -945,7 +941,7 @@ const LEGAL_MANAGER = section('legal', 'manager', [
     description: 'Tracker perkara litigasi aktif.',
     exampleGoal:
       'Susun tracker 24 perkara aktif: posisi proses, agenda sidang 4 minggu ke depan, exposure Rp 18 M total, dan kebutuhan dukungan lawyer eksternal.',
-    outputFormat: 'dataset',
+    outputFormat: 'data',
     frequency: 'weekly',
   },
 ]);
@@ -959,7 +955,7 @@ const LEGAL_DIREKTUR = section('legal', 'direktur', [
     exampleGoal:
       'Susun strategi legal 2026-2028: konsolidasi anak perusahaan, standardisasi kontrak grup, dan kebijakan ESG yang sejalan dengan Permeneg BUMN PER-2/MBU/03/2023.',
     outputFormat: 'report',
-    frequency: 'quarterly',
+    frequency: 'monthly',
   },
   {
     command: '/regulatory-compliance-report',
@@ -969,7 +965,7 @@ const LEGAL_DIREKTUR = section('legal', 'direktur', [
     exampleGoal:
       'Susun laporan kepatuhan korporasi untuk Komite Audit Q2 2026: status kepatuhan 12 regulasi prioritas, temuan, action plan, dan progress remediasi.',
     outputFormat: 'report',
-    frequency: 'quarterly',
+    frequency: 'monthly',
   },
 ]);
 
@@ -985,7 +981,7 @@ const MKT_STAFF = section('marketing', 'staff', [
     description: 'Draft konten untuk channel marketing.',
     exampleGoal:
       'Draft 4 caption Instagram untuk kampanye Tabungan Emas batch Juli 2026. Target audiens 25-35 tahun, gaya konversasional, sertakan CTA dan disclaimer OJK.',
-    outputFormat: 'file',
+    outputFormat: 'report',
     frequency: 'weekly',
   },
   {
@@ -995,7 +991,7 @@ const MKT_STAFF = section('marketing', 'staff', [
     description: 'Pantau engagement sosial media.',
     exampleGoal:
       'Pantau Instagram, TikTok, dan X resmi 7 hari terakhir. Sajikan reach, engagement rate, dan top 5 konten. Highlight komentar negatif yang perlu direspons.',
-    outputFormat: 'dashboard',
+    outputFormat: 'analysis',
     frequency: 'weekly',
   },
   {
@@ -1005,7 +1001,7 @@ const MKT_STAFF = section('marketing', 'staff', [
     description: 'Pantau aktivitas kompetitor.',
     exampleGoal:
       'Pantau aktivitas marketing 3 kompetitor utama (BCA, BRI, BNI) dalam 14 hari terakhir. Highlight produk baru, kampanye besar, dan tarif promo.',
-    outputFormat: 'report',
+    outputFormat: 'analysis',
     frequency: 'weekly',
   },
   {
@@ -1015,7 +1011,7 @@ const MKT_STAFF = section('marketing', 'staff', [
     description: 'Pantau brand mention di internet.',
     exampleGoal:
       'Pantau brand mention nama perusahaan di Google News, X, dan Detik selama 24 jam terakhir. Sortir negatif vs positif dan eskalasi yang berpotensi krisis.',
-    outputFormat: 'report',
+    outputFormat: 'analysis',
     frequency: 'daily',
   },
 ]);
@@ -1028,7 +1024,7 @@ const MKT_SUPERVISOR = section('marketing', 'supervisor', [
     description: 'Analisa performance kampanye.',
     exampleGoal:
       'Analisa kampanye KPR Promo Mei 2026: spend Rp 480 juta, leads 2.142, kualifikasi 38%, akad kredit 124 KPR, CPA Rp 3,8 juta. Bandingkan dengan kampanye sebelumnya.',
-    outputFormat: 'report',
+    outputFormat: 'analysis',
     frequency: 'monthly',
   },
   {
@@ -1038,8 +1034,8 @@ const MKT_SUPERVISOR = section('marketing', 'supervisor', [
     description: 'Susun insight audiens kampanye.',
     exampleGoal:
       'Susun insight audiens nasabah Tabungan Generasi-Z (18-25 tahun). Profile demografi, behavior digital, dan top 5 channel paling efektif.',
-    outputFormat: 'report',
-    frequency: 'quarterly',
+    outputFormat: 'analysis',
+    frequency: 'monthly',
   },
   {
     command: '/content-performance',
@@ -1048,7 +1044,7 @@ const MKT_SUPERVISOR = section('marketing', 'supervisor', [
     description: 'Performance konten per channel.',
     exampleGoal:
       'Susun performance konten 30 hari terakhir per channel (IG, TikTok, YouTube, Blog). Identifikasi 5 konten top performer dan pola yang bisa direplikasi.',
-    outputFormat: 'dashboard',
+    outputFormat: 'analysis',
     frequency: 'monthly',
   },
 ]);
@@ -1071,8 +1067,8 @@ const MKT_MANAGER = section('marketing', 'manager', [
     description: 'Analisa ROI marketing per channel.',
     exampleGoal:
       'Hitung ROMI per channel YTD 2026: Search Ads, Meta Ads, TikTok Ads, Influencer, OOH. Identifikasi 2 channel ROMI < 1 dan rekomendasi realokasi budget.',
-    outputFormat: 'report',
-    frequency: 'quarterly',
+    outputFormat: 'analysis',
+    frequency: 'monthly',
     stakeholders: ['finance'],
   },
   {
@@ -1082,8 +1078,8 @@ const MKT_MANAGER = section('marketing', 'manager', [
     description: 'Riset pasar segmen tertentu.',
     exampleGoal:
       'Riset pasar tabungan haji generasi 30-45 tahun di 5 kota besar. Estimasi TAM, perilaku menabung, kompetitor utama, dan peluang produk yang belum digarap.',
-    outputFormat: 'report',
-    frequency: 'quarterly',
+    outputFormat: 'analysis',
+    frequency: 'monthly',
   },
   {
     command: '/brand-health',
@@ -1092,8 +1088,8 @@ const MKT_MANAGER = section('marketing', 'manager', [
     description: 'Brand health check periodik.',
     exampleGoal:
       'Susun brand health check Q2 2026: awareness, consideration, preference, dan NPS. Bandingkan dengan 3 kompetitor utama dan tren 4 kuartal terakhir.',
-    outputFormat: 'dashboard',
-    frequency: 'quarterly',
+    outputFormat: 'analysis',
+    frequency: 'monthly',
   },
 ]);
 
@@ -1106,7 +1102,7 @@ const MKT_DIREKTUR = section('marketing', 'direktur', [
     exampleGoal:
       'Susun strategi marketing 2026-2028: positioning, target segmen prioritas, channel mix, brand investment Rp 84 M, dan target NTB 320.000 nasabah.',
     outputFormat: 'report',
-    frequency: 'quarterly',
+    frequency: 'monthly',
     stakeholders: ['finance'],
   },
   {
@@ -1116,8 +1112,8 @@ const MKT_DIREKTUR = section('marketing', 'direktur', [
     description: 'Rencana ekspansi pasar / produk baru.',
     exampleGoal:
       'Susun rencana ekspansi ke Indonesia Timur (Sulawesi, Maluku, Papua) periode 2027. Strategi cabang, digital, dan kemitraan dengan tinjauan capex per opsi.',
-    outputFormat: 'report',
-    frequency: 'quarterly',
+    outputFormat: 'analysis',
+    frequency: 'monthly',
     stakeholders: ['operations', 'finance'],
   },
 ]);
@@ -1134,8 +1130,8 @@ const PROC_STAFF = section('procurement', 'staff', [
     description: 'Cek data vendor di master list.',
     exampleGoal:
       'Cek profil PT Saprotan Utama: status NPWP, klasifikasi vendor, history transaksi 12 bulan (Rp 28 M / 14 transaksi), dan rating evaluasi terakhir.',
-    outputFormat: 'dataset',
-    frequency: 'on-demand',
+    outputFormat: 'data',
+    frequency: 'one-time',
   },
   {
     command: '/input-purchase-order',
@@ -1144,7 +1140,7 @@ const PROC_STAFF = section('procurement', 'staff', [
     description: 'Input PO baru ke sistem ERP.',
     exampleGoal:
       'Input PO baru ke ERP: nomor PO/06/2026/0142, vendor PT Wijaya Karya, item 18 line, total Rp 1,4 M, term pembayaran 30 hari, kirim ke approval Manager.',
-    outputFormat: 'notification',
+    outputFormat: 'action',
     frequency: 'daily',
   },
   {
@@ -1154,7 +1150,7 @@ const PROC_STAFF = section('procurement', 'staff', [
     description: 'Track status pengadaan aktif.',
     exampleGoal:
       'Tampilkan 18 pengadaan aktif beserta tahap (RFP, evaluasi, negosiasi, kontrak). Highlight pengadaan yang sudah > 30 hari menggantung di satu tahap.',
-    outputFormat: 'dataset',
+    outputFormat: 'data',
     frequency: 'weekly',
   },
 ]);
@@ -1167,8 +1163,8 @@ const PROC_SUPERVISOR = section('procurement', 'supervisor', [
     description: 'Evaluasi periodik vendor aktif.',
     exampleGoal:
       'Evaluasi 24 vendor aktif Q2 2026: tepat waktu, kualitas, harga kompetitif, responsif. Sortir vendor rating < 3,0 untuk rencana penggantian.',
-    outputFormat: 'report',
-    frequency: 'quarterly',
+    outputFormat: 'analysis',
+    frequency: 'monthly',
   },
   {
     command: '/tender-monitoring',
@@ -1177,7 +1173,7 @@ const PROC_SUPERVISOR = section('procurement', 'supervisor', [
     description: 'Monitor tender aktif.',
     exampleGoal:
       'Monitor 6 tender aktif Q2 2026 (total HPS Rp 28 M). Pantau jadwal aanwijzing, klarifikasi, pemasukan penawaran, dan pengumuman pemenang.',
-    outputFormat: 'dataset',
+    outputFormat: 'data',
     frequency: 'weekly',
   },
   {
@@ -1187,7 +1183,7 @@ const PROC_SUPERVISOR = section('procurement', 'supervisor', [
     description: 'Cek kontrak yang akan berakhir.',
     exampleGoal:
       'Cek kontrak vendor yang berakhir dalam 90 hari ke depan. Total 12 kontrak senilai Rp 14 M — siapkan strategi (perpanjang, re-tender, atau dihentikan).',
-    outputFormat: 'dataset',
+    outputFormat: 'data',
     frequency: 'monthly',
   },
 ]);
@@ -1210,8 +1206,8 @@ const PROC_MANAGER = section('procurement', 'manager', [
     description: 'Analisa cost savings procurement.',
     exampleGoal:
       'Susun analisa cost savings YTD 2026: realisasi savings Rp 4,2 M (target Rp 5 M). Per kategori belanja, identifikasi peluang savings sisa 6 bulan.',
-    outputFormat: 'report',
-    frequency: 'quarterly',
+    outputFormat: 'analysis',
+    frequency: 'monthly',
     stakeholders: ['finance'],
   },
   {
@@ -1221,8 +1217,8 @@ const PROC_MANAGER = section('procurement', 'manager', [
     description: 'Asesmen risiko supplier strategis.',
     exampleGoal:
       'Asesmen risiko 12 supplier strategis (single source, ketergantungan > 60%): finansial, operasional, geopolitik. Susun mitigasi per supplier kritikal.',
-    outputFormat: 'report',
-    frequency: 'quarterly',
+    outputFormat: 'analysis',
+    frequency: 'monthly',
   },
 ]);
 
@@ -1235,7 +1231,7 @@ const PROC_DIREKTUR = section('procurement', 'direktur', [
     exampleGoal:
       'Susun strategi procurement 2026-2028: kategori manajemen, sentralisasi belanja grup, TKDN > 60%, dan target savings tahunan Rp 12 M.',
     outputFormat: 'report',
-    frequency: 'quarterly',
+    frequency: 'monthly',
     stakeholders: ['finance', 'operations'],
   },
   {
@@ -1245,8 +1241,8 @@ const PROC_DIREKTUR = section('procurement', 'direktur', [
     description: 'Evaluasi kemitraan strategis.',
     exampleGoal:
       'Evaluasi 4 strategic partnership existing (Telkom, Pertamina, Pos Indonesia, PLN). Cek realisasi value capture, perpanjangan, atau eksplorasi mitra baru.',
-    outputFormat: 'report',
-    frequency: 'quarterly',
+    outputFormat: 'analysis',
+    frequency: 'monthly',
     stakeholders: ['legal'],
   },
 ]);
@@ -1263,7 +1259,7 @@ const CS_STAFF = section('cs', 'staff', [
     description: 'Cek status ticket pelanggan.',
     exampleGoal:
       'Tampilkan status semua ticket pelanggan yang ditangani agent NIP 19920311 hari ini. Ada 24 ticket — 18 closed, 4 in-progress, 2 escalated.',
-    outputFormat: 'dataset',
+    outputFormat: 'data',
     frequency: 'daily',
   },
   {
@@ -1273,8 +1269,8 @@ const CS_STAFF = section('cs', 'staff', [
     description: 'Susun template balasan keluhan.',
     exampleGoal:
       'Susun draf balasan keluhan keterlambatan transfer antar-bank > 2 jam. Bahasa empatik, jelas, sertakan SLA dan langkah follow-up untuk pelanggan.',
-    outputFormat: 'file',
-    frequency: 'on-demand',
+    outputFormat: 'report',
+    frequency: 'one-time',
   },
   {
     command: '/escalate-issue',
@@ -1284,7 +1280,7 @@ const CS_STAFF = section('cs', 'staff', [
     exampleGoal:
       'Eskalasi ticket #CS-2026-04812 (transaksi gagal Rp 8,4 juta) ke Tim Treasury. Sertakan kronologis, bukti screenshot, dan target resolusi 2 jam.',
     outputFormat: 'notification',
-    frequency: 'on-demand',
+    frequency: 'one-time',
   },
   {
     command: '/customer-history',
@@ -1294,7 +1290,7 @@ const CS_STAFF = section('cs', 'staff', [
     exampleGoal:
       'Tarik history interaksi nasabah CIF 0042-9981 12 bulan terakhir: 14 transaksi, 3 keluhan terkait kartu debit, NPS terakhir 6/10. Siapkan ringkasan untuk RM.',
     outputFormat: 'report',
-    frequency: 'on-demand',
+    frequency: 'one-time',
   },
 ]);
 
@@ -1306,7 +1302,7 @@ const CS_SUPERVISOR = section('cs', 'supervisor', [
     description: 'Analisa pola ticket pelanggan.',
     exampleGoal:
       'Analisa pola ticket 30 hari terakhir: top 5 kategori keluhan, channel masuk, dan waktu peak. Identifikasi 2 root cause untuk eskalasi ke divisi terkait.',
-    outputFormat: 'report',
+    outputFormat: 'analysis',
     frequency: 'weekly',
   },
   {
@@ -1316,7 +1312,7 @@ const CS_SUPERVISOR = section('cs', 'supervisor', [
     description: 'Monitor pencapaian SLA CS.',
     exampleGoal:
       'Susun monitoring SLA CS Mei 2026: First Response Time, Resolution Time, dan FCR. SLA FRT 95% < 1 menit — realisasi 92%, uraikan penyebab gap.',
-    outputFormat: 'dashboard',
+    outputFormat: 'analysis',
     frequency: 'weekly',
   },
   {
@@ -1326,7 +1322,7 @@ const CS_SUPERVISOR = section('cs', 'supervisor', [
     description: 'Performance tim CS per agent.',
     exampleGoal:
       'Susun performance per agent Mei 2026: jumlah ticket handle, AHT, CSAT, dan FCR. Identifikasi 3 agent top performer dan 2 yang perlu coaching.',
-    outputFormat: 'report',
+    outputFormat: 'analysis',
     frequency: 'monthly',
   },
 ]);
@@ -1349,8 +1345,8 @@ const CS_MANAGER = section('cs', 'manager', [
     description: 'Analisa kepuasan pelanggan.',
     exampleGoal:
       'Susun analisa CSAT dan NPS Q2 2026. NPS turun dari 42 ke 38 — uraikan dimensi yang menurun (digital, branch, call center) dan rekomendasi perbaikan.',
-    outputFormat: 'report',
-    frequency: 'quarterly',
+    outputFormat: 'analysis',
+    frequency: 'monthly',
   },
   {
     command: '/improvement-plan',
@@ -1360,7 +1356,7 @@ const CS_MANAGER = section('cs', 'manager', [
     exampleGoal:
       'Susun improvement plan CS H2 2026: 5 inisiatif prioritas (chatbot AI, knowledge base, IVR, training, hiring) dengan owner, KPI, dan budget Rp 3,2 M.',
     outputFormat: 'report',
-    frequency: 'quarterly',
+    frequency: 'monthly',
     stakeholders: ['it', 'hrd', 'finance'],
   },
 ]);
@@ -1377,7 +1373,7 @@ const GA_STAFF = section('ga', 'staff', [
     description: 'Cek data aset tetap.',
     exampleGoal:
       'Cek aset tetap di Kantor Pusat lantai 4: 142 kursi, 84 meja, 28 PC desktop, 12 laptop. Bandingkan dengan stock opname terakhir dan tandai selisih.',
-    outputFormat: 'dataset',
+    outputFormat: 'data',
     frequency: 'monthly',
   },
   {
@@ -1387,8 +1383,8 @@ const GA_STAFF = section('ga', 'staff', [
     description: 'Jadwal maintenance fasilitas.',
     exampleGoal:
       'Susun jadwal maintenance fasilitas Q3 2026: AC sentral, lift, genset, fire alarm di Kantor Pusat dan 3 cabang utama. Koordinasi dengan vendor terkait.',
-    outputFormat: 'report',
-    frequency: 'quarterly',
+    outputFormat: 'action',
+    frequency: 'monthly',
   },
   {
     command: '/pengajuan-fasilitas',
@@ -1397,7 +1393,7 @@ const GA_STAFF = section('ga', 'staff', [
     description: 'Proses pengajuan fasilitas kantor.',
     exampleGoal:
       'Proses 14 pengajuan fasilitas masuk minggu ini: 6 ATK, 4 meja kerja, 2 ruang meeting, 2 perbaikan AC. Verifikasi anggaran dan kirim approval ke supervisor.',
-    outputFormat: 'dataset',
+    outputFormat: 'action',
     frequency: 'weekly',
   },
 ]);
@@ -1411,7 +1407,7 @@ const GA_SUPERVISOR = section('ga', 'supervisor', [
     exampleGoal:
       'Susun laporan aset Q2 2026: total 4.842 aset (nilai buku Rp 84,2 M), penambahan 142, penghapusan 38. Tampilkan per kategori dan per lokasi.',
     outputFormat: 'report',
-    frequency: 'quarterly',
+    frequency: 'monthly',
     stakeholders: ['finance'],
   },
   {
@@ -1421,8 +1417,8 @@ const GA_SUPERVISOR = section('ga', 'supervisor', [
     description: 'Evaluasi vendor GA (cleaning, security, dst).',
     exampleGoal:
       'Evaluasi 4 vendor GA Q2 2026: cleaning, security, catering, building maintenance. Skoring availability, kualitas SDM, biaya, dan kepuasan pengguna.',
-    outputFormat: 'report',
-    frequency: 'quarterly',
+    outputFormat: 'analysis',
+    frequency: 'monthly',
   },
   {
     command: '/budget-ga',
@@ -1431,7 +1427,7 @@ const GA_SUPERVISOR = section('ga', 'supervisor', [
     description: 'Pantau realisasi anggaran GA.',
     exampleGoal:
       'Pantau realisasi anggaran GA Mei 2026: pagu Rp 1,8 M, realisasi Rp 1,52 M. Identifikasi line item yang berisiko over di Juni dan rekomendasi adjustment.',
-    outputFormat: 'dashboard',
+    outputFormat: 'analysis',
     frequency: 'monthly',
     stakeholders: ['finance'],
   },
@@ -1456,7 +1452,7 @@ const GA_MANAGER = section('ga', 'manager', [
     exampleGoal:
       'Susun facility planning 2026-2028: konsolidasi 3 kantor di Jakarta menjadi 1 tower, target densitas 1,4 sqm per FTE, dan estimasi capex Rp 48 M.',
     outputFormat: 'report',
-    frequency: 'quarterly',
+    frequency: 'monthly',
     stakeholders: ['finance', 'hrd'],
   },
 ]);
@@ -1465,7 +1461,7 @@ const GA_MANAGER = section('ga', 'manager', [
 //  Cross-Department / Stakeholder
 // =====================================================================
 
-const CROSS = section(null, 'manager', [
+const CROSS = section('cross-department', 'manager', [
   {
     command: '/approve-pengajuan',
     category: 'Approval',
@@ -1473,7 +1469,7 @@ const CROSS = section(null, 'manager', [
     description: 'Setujui pengajuan dari unit kerja lain.',
     exampleGoal:
       'Tinjau 8 pengajuan menggantung > 24 jam dari unit lintas-divisi. Beri keputusan approve/reject/return berdasar batas wewenang dan dokumen pendukung.',
-    outputFormat: 'approval',
+    outputFormat: 'action',
     frequency: 'daily',
   },
   {
@@ -1483,13 +1479,13 @@ const CROSS = section(null, 'manager', [
     description: 'Susun laporan gabungan lintas-divisi.',
     exampleGoal:
       'Gabungkan data realisasi IT (capex Rp 18,4 M), Finance (budget Rp 22 M), Operasional (produksi 4.820 ton) ke satu dashboard eksekutif Q2 2026.',
-    outputFormat: 'dashboard',
+    outputFormat: 'analysis',
     frequency: 'monthly',
     stakeholders: ['it', 'finance', 'operations'],
   },
 ]);
 
-const CROSS_DIREKTUR = section(null, 'direktur', [
+const CROSS_DIREKTUR = section('cross-department', 'direktur', [
   {
     command: '/dashboard-executive',
     category: 'Eksekutif',
@@ -1497,7 +1493,7 @@ const CROSS_DIREKTUR = section(null, 'direktur', [
     description: 'Dashboard eksekutif lintas-divisi.',
     exampleGoal:
       'Susun dashboard eksekutif Juni 2026: KPI 9 divisi, realisasi RBB, top 5 risiko, status 12 inisiatif strategis, dan agenda Direksi pekan depan.',
-    outputFormat: 'dashboard',
+    outputFormat: 'analysis',
     frequency: 'monthly',
     stakeholders: ['it', 'hrd', 'finance', 'operations', 'legal', 'marketing'],
   },
@@ -1509,7 +1505,7 @@ const CROSS_DIREKTUR = section(null, 'direktur', [
     exampleGoal:
       'Susun status audit & kepatuhan korporasi Q2 2026: 14 temuan audit internal terbuka, 4 temuan audit eksternal, status remediasi, dan eskalasi ke Komite Audit.',
     outputFormat: 'report',
-    frequency: 'quarterly',
+    frequency: 'monthly',
     stakeholders: ['legal', 'finance'],
   },
 ]);

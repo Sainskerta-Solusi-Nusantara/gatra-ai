@@ -189,4 +189,27 @@ CREATE TABLE IF NOT EXISTS e_folder_permission (
 );
 CREATE INDEX IF NOT EXISTS idx_folder_perm_dept ON e_folder_permission(department_id);
 CREATE INDEX IF NOT EXISTS idx_folder_perm_path ON e_folder_permission(folder_path);
+
+-- ===================== Use case templates =====================
+-- One row per /command. department_id stores the catalogue slug
+-- ('it', 'hrd', ...) or NULL for cross-department templates.
+-- stakeholders is a JSON array of consumer/contributor department slugs.
+
+CREATE TABLE IF NOT EXISTS e_command_template (
+  id              TEXT PRIMARY KEY,
+  department_id   TEXT,
+  min_jabatan     TEXT NOT NULL DEFAULT 'staff',
+  command         TEXT NOT NULL,
+  category        TEXT NOT NULL,
+  title           TEXT NOT NULL,
+  description     TEXT NOT NULL,
+  example_goal    TEXT NOT NULL,
+  output_format   TEXT NOT NULL DEFAULT 'report',
+  frequency       TEXT NOT NULL DEFAULT 'one-time',
+  stakeholders    TEXT,
+  created_at      INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_template_dept    ON e_command_template(department_id);
+CREATE INDEX IF NOT EXISTS idx_template_command ON e_command_template(command);
+CREATE INDEX IF NOT EXISTS idx_template_jabatan ON e_command_template(min_jabatan);
 `;

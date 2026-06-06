@@ -51,6 +51,38 @@ const DEFAULT_DEPARTMENTS: SeedSpec[] = [
       { path: '/shared/policies', level: 'write' },
     ],
   },
+  {
+    name: 'Marketing',
+    description: 'Marketing & komunikasi — kampanye, brand, market research.',
+    folders: [
+      { path: '/marketing', level: 'admin' },
+      { path: '/shared/reports', level: 'read' },
+    ],
+  },
+  {
+    name: 'Procurement',
+    description: 'Procurement — vendor, pengadaan, kontrak vendor.',
+    folders: [
+      { path: '/procurement', level: 'admin' },
+      { path: '/shared/policies', level: 'read' },
+    ],
+  },
+  {
+    name: 'Customer Service',
+    description: 'Customer service — penanganan keluhan, NPS, escalation.',
+    folders: [
+      { path: '/cs', level: 'admin' },
+      { path: '/shared', level: 'read' },
+    ],
+  },
+  {
+    name: 'General Affairs',
+    description: 'General Affairs — aset, fasilitas, vendor non-IT.',
+    folders: [
+      { path: '/ga', level: 'admin' },
+      { path: '/shared/reports', level: 'read' },
+    ],
+  },
 ];
 
 interface UserSeed {

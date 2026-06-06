@@ -26,11 +26,34 @@ import { tools } from '../tools/index.js';
 import { requireToken } from './auth.js';
 import { buildRbacRoutes } from './rbac-routes.js';
 import {
+  formatHelpText,
+  getCategories,
+  getStakeholderTemplates,
+  getTemplateByCommand,
+} from '../templates/engine.js';
+import { CATALOG } from '../templates/catalog.js';
+import {
+  isDepartmentId,
+  type DepartmentId,
+  type JabatanLevel,
+} from '../templates/types.js';
+import {
   AdminRemoveUserSchema,
   CreateGoalSchema,
   DecideApprovalSchema,
   ResignSchema,
 } from './validators.js';
+
+const JABATAN_VALUES: readonly JabatanLevel[] = [
+  'staff',
+  'supervisor',
+  'manager',
+  'direktur',
+  'admin_system',
+];
+function isJabatanLevel(v: unknown): v is JabatanLevel {
+  return typeof v === 'string' && (JABATAN_VALUES as readonly string[]).includes(v);
+}
 
 /** Throw a 403 unless the caller can see this goal. */
 function gateGoal(req: Request, res: Response, goalId: string): { ok: true; departmentId: string | null } | null {
@@ -513,6 +536,172 @@ export function buildRoutes(sessions: SessionManager): Router {
   // ---------- Tools registry ----------
   r.get('/tools', (_req, res) => {
     res.json({ items: tools.list() });
+  });
+
+  // ---------- Use case templates / command catalogue ----------
+
+  /**
+   * GET /api/templates — list catalogue. Optional filters:
+   *   ?department=<slug>     filter to one department; 'cross-department'
+   *                          is treated as a department too. When set, the
+   *                          response also folds in cross-department
+   *                          templates so users see everything relevant.
+   *   ?jabatan=<level>       only return templates the level can invoke.
+   *                          When absent, falls back to req.user.jabatan.
+   *   ?includeAll=1          override the auto-filter — return entire catalog.
+   *
+   * Returns: { items, count, categories }.
+   */
+  r.get('/templates', (req: Request, res: Response) => {
+    const q = req.query as Record<string, string | undefined>;
+    const includeAll = q.includeAll === '1' || q.includeAll === 'true';
+    const jabatanQ = q.jabatan;
+    const jabatan: JabatanLevel | undefined =
+      jabatanQ && isJabatanLevel(jabatanQ)
+        ? jabatanQ
+        : (req.user?.jabatan as JabatanLevel | undefined);
+
+    // Auto-filter: if user has department & no override, restrict to their department
+    const userDept = req.user?.departmentId;
+    const deptQ = q.department ?? (includeAll ? undefined : userDept);
+    let items = CATALOG.slice();
+
+    if (deptQ) {
+      if (deptQ === '__all__' || deptQ === 'all') {
+        // explicit 'all' — skip department filter, still apply jabatan
+      } else if (!isDepartmentId(deptQ)) {
+        res.status(400).json({ error: 'invalid department slug' });
+        return;
+      } else {
+        const dept: DepartmentId = deptQ;
+        items = items.filter(
+          (t) =>
+            t.departmentId === dept ||
+            t.departmentId === null ||
+            t.departmentId === 'cross-department',
+        );
+      }
+    }
+
+    if (jabatan) {
+      const rank: Record<JabatanLevel, number> = {
+        staff: 1,
+        supervisor: 2,
+        manager: 3,
+        direktur: 4,
+        admin_system: 99,
+      };
+      items = items.filter((t) => rank[jabatan] >= rank[t.minJabatan]);
+    }
+
+    const categoryParam = q.category;
+    if (categoryParam) {
+      items = items.filter((t) => t.category === categoryParam);
+    }
+
+    items.sort((a, b) => {
+      const da = a.departmentId ?? 'cross-department';
+      const db = b.departmentId ?? 'cross-department';
+      if (da !== db) return da.localeCompare(db);
+      return a.command.localeCompare(b.command);
+    });
+
+    const cats = new Set<string>();
+    items.forEach((t) => cats.add(t.category));
+
+    res.json({
+      items,
+      count: items.length,
+      categories: [...cats].sort(),
+      stakeholderCount: getStakeholderTemplates().length,
+    });
+  });
+
+  /**
+   * GET /api/templates/help — plain-text help suitable for WA/Telegram.
+   * No markdown tables, just `/command — title` lines grouped by department.
+   * ?jabatan=<level>  optional override; defaults to req.user.jabatan.
+   * ?format=json      return as JSON instead of text.
+   */
+  r.get('/templates/help', (req: Request, res: Response) => {
+    const q = req.query as Record<string, string | undefined>;
+    const jabatanQ = q.jabatan;
+    const jabatan: JabatanLevel =
+      (jabatanQ && isJabatanLevel(jabatanQ) ? jabatanQ : null) ??
+      (req.user?.jabatan as JabatanLevel | undefined) ??
+      'staff';
+
+    if (q.format === 'json') {
+      res.json({
+        jabatan,
+        text: formatHelpText(jabatan),
+        totalTemplates: CATALOG.length,
+      });
+      return;
+    }
+    res.type('text/plain').send(formatHelpText(jabatan));
+  });
+
+  /**
+   * GET /api/templates/categories — categories for a department.
+   */
+  r.get('/templates/categories', (req: Request, res: Response) => {
+    const q = req.query as Record<string, string | undefined>;
+    const deptQ = q.department;
+    const dept: string | null =
+      !deptQ || deptQ === 'all'
+        ? null
+        : isDepartmentId(deptQ)
+          ? deptQ
+          : null;
+    res.json({ items: getCategories(dept) });
+  });
+
+  /**
+   * GET /api/templates/:command — single template by slash command.
+   * Command can be given with or without leading slash.
+   */
+  r.get('/templates/:command', (req: Request, res: Response) => {
+    const raw = String(req.params.command);
+    const command = raw.startsWith('/') ? raw : `/${raw}`;
+    const tpl = getTemplateByCommand(command);
+    if (!tpl) {
+      res.status(404).json({ error: 'template not found', command });
+      return;
+    }
+
+    // RBAC: check if user is authorized for this template's department + jabatan
+    const u = req.user;
+    if (u) {
+      const userLevel = ({ staff: 1, supervisor: 2, manager: 3, direktur: 4, admin_system: 99 } as Record<string, number>)[u.jabatan] ?? 0;
+      const reqLevel = ({ staff: 1, supervisor: 2, manager: 3, direktur: 4, admin_system: 99 } as Record<string, number>)[tpl.minJabatan] ?? 999;
+
+      if (u.jabatan !== 'admin_system' && tpl.departmentId && tpl.departmentId !== 'cross-department') {
+        if (tpl.departmentId !== u.departmentId) {
+          res.status(403).json({
+            error: 'forbidden',
+            message: 'Template ini khusus untuk departemen ' + tpl.departmentId.toUpperCase() + '. Anda dari ' + (u.departmentName ?? u.departmentId?.toUpperCase() ?? 'unknown') + ' tidak memiliki akses.',
+            command,
+            templateDepartment: tpl.departmentId,
+            userDepartment: u.departmentId,
+          });
+          return;
+        }
+      }
+
+      if (userLevel < reqLevel && u.jabatan !== 'admin_system') {
+        res.status(403).json({
+          error: 'forbidden',
+          message: 'Template ini membutuhkan jabatan minimal ' + tpl.minJabatan + '. Jabatan Anda: ' + u.jabatan,
+          command,
+          minJabatan: tpl.minJabatan,
+          userJabatan: u.jabatan,
+        });
+        return;
+      }
+    }
+
+    res.json(tpl);
   });
 
   // ---------- Error fallthrough ----------

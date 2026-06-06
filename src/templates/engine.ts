@@ -1,7 +1,14 @@
 // Template engine — filter & serve use-case templates
 
 import { CATALOG } from './catalog.js';
-import type { HelpGroup, JabatanLevel, UseCaseTemplate } from './types.js';
+import {
+  DEPARTMENT_NAMES,
+  JABATAN_NAMES,
+  type DepartmentId,
+  type HelpGroup,
+  type JabatanLevel,
+  type UseCaseTemplate,
+} from './types.js';
 
 const JABATAN_ORDER: Record<JabatanLevel, number> = {
   staff: 0,
@@ -67,12 +74,17 @@ export function getHelpGroups(jabatan: JabatanLevel): HelpGroup[] {
 
   return Object.entries(groups).map(([key, templates]) => {
     const [deptRaw, jab] = key.split(':') as [string, JabatanLevel];
-    const deptId = deptRaw === 'cross' ? null : deptRaw;
+    const deptId: DepartmentId | null =
+      deptRaw === 'cross' ? null : (deptRaw as DepartmentId);
+    const departmentName =
+      deptId === null
+        ? 'Lintas Departemen'
+        : DEPARTMENT_NAMES[deptId] ?? deptRaw;
     return {
-      departmentId: deptId as any,
-      departmentName: deptRaw === 'cross' ? 'Lintas Departemen' : deptRaw.toUpperCase(),
+      departmentId: deptId,
+      departmentName,
       jabatan: jab,
-      jabatanName: jab.charAt(0).toUpperCase() + jab.slice(1),
+      jabatanName: JABATAN_NAMES[jab] ?? jab,
       templates,
     };
   });
@@ -86,7 +98,7 @@ export function formatHelpText(jabatan: JabatanLevel): string {
   for (const group of groups) {
     parts.push(`━━━ ${group.departmentName} • ${group.jabatanName} ━━━`);
     for (const t of group.templates) {
-      parts.push(`/${t.command} — ${t.title}`);
+      parts.push(`${t.command} — ${t.title}`);
       parts.push(`   ${t.description}`);
       parts.push('');
     }

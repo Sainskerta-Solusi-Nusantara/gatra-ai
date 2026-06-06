@@ -102,6 +102,33 @@ export const api = {
       { waNumber, removedByWa },
     ),
   listResignedUsers: () => request<{ items: ResignedUser[] }>('GET', '/admin/resigned-users'),
+  // ---- Templates ----
+  listTemplates: (params: { department?: string; jabatan?: string; category?: string; includeAll?: boolean } = {}) => {
+    const q = new URLSearchParams();
+    if (params.department) q.set('department', params.department);
+    if (params.jabatan) q.set('jabatan', params.jabatan);
+    if (params.category) q.set('category', params.category);
+    if (params.includeAll) q.set('includeAll', '1');
+    return request<TemplatesResponse>('GET', `/templates?${q.toString()}`);
+  },
+  getTemplate: (command: string) => {
+    const c = command.startsWith('/') ? command.slice(1) : command;
+    return request<UseCaseTemplate>('GET', `/templates/${encodeURIComponent(c)}`);
+  },
+  templateHelp: (jabatan?: string) => {
+    const q = new URLSearchParams();
+    if (jabatan) q.set('jabatan', jabatan);
+    q.set('format', 'json');
+    return request<{ jabatan: string; text: string; totalTemplates: number }>(
+      'GET',
+      `/templates/help?${q.toString()}`,
+    );
+  },
+  templateCategories: (department?: string) => {
+    const q = new URLSearchParams();
+    if (department) q.set('department', department);
+    return request<{ items: string[] }>('GET', `/templates/categories?${q.toString()}`);
+  },
 };
 
 // ---------- Types (mirror src/memory/types.ts) ----------
@@ -341,4 +368,59 @@ export interface CreateGoalInput {
   spec: Goal['spec'];
   budget?: Partial<Goal['budget']>;
   policy?: Partial<Goal['policy']>;
+}
+
+// ---------- Templates ----------
+
+export type TemplateDepartmentId =
+  | 'it'
+  | 'hrd'
+  | 'finance'
+  | 'operations'
+  | 'legal'
+  | 'marketing'
+  | 'procurement'
+  | 'cs'
+  | 'ga'
+  | 'cross-department';
+
+export type TemplateOutputFormat =
+  | 'report'
+  | 'notification'
+  | 'data'
+  | 'action'
+  | 'analysis'
+  | 'dataset'
+  | 'dashboard'
+  | 'file'
+  | 'approval';
+
+export type TemplateFrequency =
+  | 'one-time'
+  | 'daily'
+  | 'weekly'
+  | 'monthly'
+  | 'continuous'
+  | 'quarterly'
+  | 'on-demand';
+
+export interface UseCaseTemplate {
+  id: string;
+  departmentId: TemplateDepartmentId | null;
+  minJabatan: JabatanLevel;
+  command: string;
+  category: string;
+  title: string;
+  description: string;
+  exampleGoal: string;
+  outputFormat: TemplateOutputFormat;
+  frequency: TemplateFrequency;
+  stakeholders: string[];
+}
+
+export interface TemplatesResponse {
+  items: UseCaseTemplate[];
+  count: number;
+  categories: string[];
+  stakeholderCount: number;
 }

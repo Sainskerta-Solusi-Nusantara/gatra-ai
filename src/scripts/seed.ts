@@ -2,12 +2,19 @@ import { config } from '../config.js';
 import { Goals, migrate } from '../memory/memory.js';
 import { logger } from '../logger.js';
 import { Departments, Users, seedRbac } from '../rbac/index.js';
+import { Templates } from '../templates/store.js';
 
 migrate();
 
 // Seed RBAC first so the sample goal has a department to live in.
 const rbacResult = seedRbac();
 logger.info(rbacResult, 'rbac seeded');
+
+// Seed the use case template catalogue. Idempotent: every run wipes and
+// re-inserts from the in-memory CATALOG, so deleted templates fall away
+// and new ones appear automatically.
+const templatesResult = Templates.seedFromCatalog();
+logger.info(templatesResult, 'use case templates seeded');
 
 // Sample resigned user — useful for the dashboard Resignation view.
 const SAMPLE_RESIGNED_WA = '+62-811-0009-9999';

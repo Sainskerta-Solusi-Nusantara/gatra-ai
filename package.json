@@ -1,0 +1,46 @@
+{
+  "name": "gatra-ai",
+  "version": "0.1.0",
+  "description": "GATRA AI — On-premise AI Agent Platform for BUMN/Konglomerasi Indonesia",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/api/server.js",
+    "dev": "tsx watch src/api/server.ts",
+    "dev:dashboard": "npm --prefix dashboard run dev",
+    "build:dashboard": "npm --prefix dashboard run build",
+    "build:all": "npm run build && npm run build:dashboard",
+    "migrate": "tsx src/memory/migrate.ts",
+    "seed": "tsx src/scripts/seed.ts",
+    "lint": "tsc --noEmit",
+    "test": "tsx --test src/**/*.test.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.1",
+    "better-sqlite3": "^11.5.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.1",
+    "express-rate-limit": "^7.4.1",
+    "helmet": "^8.0.0",
+    "morgan": "^1.10.0",
+    "pino": "^9.5.0",
+    "ulid": "^2.3.0",
+    "ws": "^8.18.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/morgan": "^1.9.9",
+    "@types/node": "^22.9.0",
+    "@types/ws": "^8.5.13",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  }
+}

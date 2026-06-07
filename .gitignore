@@ -8,3 +8,6 @@ data
 coverage
 dashboard/dist
 dashboard/node_modules
+
+# Claude Code
+.claude
